@@ -589,6 +589,59 @@
                 display: block;
             }
         }
+
+        /* Dataset Configuration Styles */
+        .column-mapping-table {
+            width: 100%;
+            margin-top: 10px;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .column-mapping-table th,
+        .column-mapping-table td {
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            text-align: left;
+        }
+
+        .column-mapping-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .column-mapping-table input[type="text"] {
+            width: 100%;
+            padding: 6px;
+            font-size: 12px;
+        }
+
+        .column-mapping-table select {
+            width: 100%;
+            padding: 6px;
+            font-size: 12px;
+        }
+
+        small {
+            display: block;
+            color: #666;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .info-box strong {
+            color: #1976d2;
+        }
     </style>
 </head>
 <body>
@@ -597,6 +650,79 @@
         <div class="panel config-panel">
             <h1>🧠 Network Builder</h1>
             
+            <div class="config-section">
+                <h2 onclick="toggleSection(this)">Dataset Configuration</h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Code Type</label>
+                        <select id="codeType" onchange="toggleDatasetConfig()">
+                            <option value="without_data">Code without Data</option>
+                            <option value="with_data">Code with Data</option>
+                        </select>
+                    </div>
+                    
+                    <div id="datasetConfigSection" style="display: none;">
+                        <div class="form-group">
+                            <label>Dataset Type</label>
+                            <select id="datasetType" onchange="updateDatasetPreview()">
+                                <option value="csv">CSV File</option>
+                                <option value="custom">Custom Array</option>
+                                <option value="builtin">Built-in Dataset (MNIST, CIFAR10)</option>
+                            </select>
+                        </div>
+
+                        <div id="csvConfig" style="display: none;">
+                            <div class="form-group">
+                                <label>CSV Filename</label>
+                                <input type="text" id="csvFilename" placeholder="data.csv" value="data.csv">
+                            </div>
+                            <div class="form-group">
+                                <label>Number of Columns</label>
+                                <input type="number" id="numColumns" value="5" min="2" onchange="generateColumnMapping()">
+                            </div>
+                            <button class="add-layer-btn" onclick="generateColumnMapping()">Generate Column Mapping</button>
+                            <div id="columnMapping"></div>
+                        </div>
+
+                        <div id="builtinConfig" style="display: none;">
+                            <div class="form-group">
+                                <label>Built-in Dataset</label>
+                                <select id="builtinDataset">
+                                    <option value="mnist">MNIST (Handwritten Digits)</option>
+                                    <option value="cifar10">CIFAR-10 (Images)</option>
+                                    <option value="fashion_mnist">Fashion MNIST</option>
+                                    <option value="imdb">IMDB Reviews</option>
+                                    <option value="reuters">Reuters News</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Train/Test Split Ratio</label>
+                            <input type="number" step="0.05" min="0.1" max="0.9" value="0.8" id="trainSplit">
+                            <small style="color: #666; font-size: 11px; display: block; margin-top: 4px;">
+                                0.8 = 80% training, 20% testing
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Batch Size</label>
+                            <input type="number" id="batchSize" value="32" min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Epochs</label>
+                            <input type="number" id="epochs" value="10" min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Validation Split</label>
+                            <input type="number" step="0.05" min="0" max="0.5" value="0.2" id="validationSplit">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="config-section">
                 <h2 onclick="toggleSection(this)">Architecture Template</h2>
                 <div class="section-content">
@@ -1261,12 +1387,36 @@
             const optimizer = document.getElementById('optimizer').value;
             const lossFunction = document.getElementById('lossFunction').value;
             const metrics = document.getElementById('metrics').value;
+            const codeType = document.getElementById('codeType').value;
 
             let code = `<span class="comment"># Import Keras 3 libraries</span>
 <span class="keyword">import</span> keras
 <span class="keyword">from</span> keras <span class="keyword">import</span> layers
+`;
 
-<span class="comment"># Define the model</span>
+            // Add data-specific imports
+            if (codeType === 'with_data') {
+                const datasetType = document.getElementById('datasetType').value;
+                
+                if (datasetType === 'csv') {
+                    code += `<span class="keyword">import</span> pandas <span class="keyword">as</span> pd
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+<span class="keyword">from</span> sklearn.model_selection <span class="keyword">import</span> train_test_split
+<span class="keyword">from</span> sklearn.preprocessing <span class="keyword">import</span> StandardScaler
+
+`;
+                } else if (datasetType === 'builtin') {
+                    code += `<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+
+`;
+                }
+                
+                // Add data loading code
+                code += generateDataLoadingCode();
+                code += '\n';
+            }
+
+            code += `<span class="comment"># Define the model</span>
 `;
 
             if (modelType === 'Sequential') {
@@ -1302,12 +1452,172 @@ model.<span class="function">compile</span>(
 
 <span class="comment"># Display model summary</span>
 model.<span class="function">summary</span>()
+`;
 
+            // Add training code if data is configured
+            if (codeType === 'with_data') {
+                code += '\n' + generateTrainingCode();
+            } else {
+                code += `
 <span class="comment"># Train the model</span>
 <span class="comment"># history = model.fit(x_train, y_train, epochs=10, batch_size=32, validation_split=0.2)</span>
 `;
+            }
 
             document.getElementById('generatedCode').innerHTML = code;
+        }
+
+        function generateDataLoadingCode() {
+            const datasetType = document.getElementById('datasetType').value;
+            let code = '';
+
+            if (datasetType === 'csv') {
+                const csvFilename = document.getElementById('csvFilename').value;
+                const trainSplit = document.getElementById('trainSplit').value;
+                
+                // Filter out excluded columns
+                const activeFeatures = columnMappings.filter(col => col.type === 'feature' && col.useFor !== 'exclude');
+                const activeTargets = columnMappings.filter(col => col.type === 'target' && col.useFor !== 'exclude');
+                
+                const features = activeFeatures.map(col => `<span class="string">'${col.name}'</span>`).join(', ');
+                const targets = activeTargets.map(col => `<span class="string">'${col.name}'</span>`).join(', ');
+                
+                if (activeFeatures.length === 0 || activeTargets.length === 0) {
+                    code += `<span class="comment"># ERROR: You must have at least one feature and one target column that is not excluded!</span>
+`;
+                    return code;
+                }
+                
+                code += `<span class="comment"># Load and prepare the dataset</span>
+df = pd.<span class="function">read_csv</span>(<span class="string">'${csvFilename}'</span>)
+
+<span class="comment"># Separate features and target (excluding marked columns)</span>
+X = df[[${features}]].<span class="function">values</span>
+y = df[[${targets}]].<span class="function">values</span>
+
+<span class="comment"># Split into train and test sets</span>
+X_train, X_test, y_train, y_test = <span class="function">train_test_split</span>(
+    X, y, 
+    train_size=<span class="number">${trainSplit}</span>, 
+    random_state=<span class="number">42</span>
+)
+
+<span class="comment"># Standardize features</span>
+scaler = StandardScaler()
+X_train = scaler.<span class="function">fit_transform</span>(X_train)
+X_test = scaler.<span class="function">transform</span>(X_test)
+`;
+            } else if (datasetType === 'builtin') {
+                const builtinDataset = document.getElementById('builtinDataset').value;
+                
+                if (builtinDataset === 'mnist' || builtinDataset === 'fashion_mnist') {
+                    code += `<span class="comment"># Load ${builtinDataset.toUpperCase()} dataset</span>
+(X_train, y_train), (X_test, y_test) = keras.datasets.${builtinDataset}.<span class="function">load_data</span>()
+
+<span class="comment"># Normalize pixel values to [0, 1]</span>
+X_train = X_train.<span class="function">astype</span>(<span class="string">"float32"</span>) / <span class="number">255.0</span>
+X_test = X_test.<span class="function">astype</span>(<span class="string">"float32"</span>) / <span class="number">255.0</span>
+
+<span class="comment"># Reshape for model input</span>
+X_train = X_train.<span class="function">reshape</span>((-<span class="number">1</span>, <span class="number">28</span> * <span class="number">28</span>))
+X_test = X_test.<span class="function">reshape</span>((-<span class="number">1</span>, <span class="number">28</span> * <span class="number">28</span>))
+
+<span class="comment"># Convert labels to categorical</span>
+y_train = keras.utils.<span class="function">to_categorical</span>(y_train, <span class="number">10</span>)
+y_test = keras.utils.<span class="function">to_categorical</span>(y_test, <span class="number">10</span>)
+`;
+                } else if (builtinDataset === 'cifar10') {
+                    code += `<span class="comment"># Load CIFAR-10 dataset</span>
+(X_train, y_train), (X_test, y_test) = keras.datasets.cifar10.<span class="function">load_data</span>()
+
+<span class="comment"># Normalize pixel values to [0, 1]</span>
+X_train = X_train.<span class="function">astype</span>(<span class="string">"float32"</span>) / <span class="number">255.0</span>
+X_test = X_test.<span class="function">astype</span>(<span class="string">"float32"</span>) / <span class="number">255.0</span>
+
+<span class="comment"># Convert labels to categorical</span>
+y_train = keras.utils.<span class="function">to_categorical</span>(y_train, <span class="number">10</span>)
+y_test = keras.utils.<span class="function">to_categorical</span>(y_test, <span class="number">10</span>)
+`;
+                } else if (builtinDataset === 'imdb') {
+                    code += `<span class="comment"># Load IMDB dataset</span>
+max_features = <span class="number">10000</span>
+maxlen = <span class="number">200</span>
+
+(X_train, y_train), (X_test, y_test) = keras.datasets.imdb.<span class="function">load_data</span>(
+    num_words=max_features
+)
+
+<span class="comment"># Pad sequences to same length</span>
+X_train = keras.utils.<span class="function">pad_sequences</span>(X_train, maxlen=maxlen)
+X_test = keras.utils.<span class="function">pad_sequences</span>(X_test, maxlen=maxlen)
+`;
+                }
+            } else if (datasetType === 'custom') {
+                code += `<span class="comment"># Create custom dataset (example)</span>
+<span class="comment"># Replace this with your actual data</span>
+X = np.<span class="function">random</span>.<span class="function">randn</span>(<span class="number">1000</span>, <span class="number">10</span>)
+y = np.<span class="function">random</span>.<span class="function">randint</span>(<span class="number">0</span>, <span class="number">2</span>, <span class="number">1000</span>)
+
+<span class="comment"># Split into train and test sets</span>
+X_train, X_test, y_train, y_test = <span class="function">train_test_split</span>(
+    X, y, 
+    train_size=<span class="number">0.8</span>, 
+    random_state=<span class="number">42</span>
+)
+`;
+            }
+
+            return code;
+        }
+
+        function generateTrainingCode() {
+            const batchSize = document.getElementById('batchSize').value;
+            const epochs = document.getElementById('epochs').value;
+            const validationSplit = document.getElementById('validationSplit').value;
+
+            let code = `<span class="comment"># Train the model</span>
+history = model.<span class="function">fit</span>(
+    X_train, y_train,
+    batch_size=<span class="number">${batchSize}</span>,
+    epochs=<span class="number">${epochs}</span>,
+    validation_split=<span class="number">${validationSplit}</span>,
+    verbose=<span class="number">1</span>
+)
+
+<span class="comment"># Evaluate on test set</span>
+test_loss, test_${document.getElementById('metrics').value} = model.<span class="function">evaluate</span>(X_test, y_test, verbose=<span class="number">0</span>)
+<span class="function">print</span>(<span class="string">f"Test Loss: {test_loss:.4f}"</span>)
+<span class="function">print</span>(<span class="string">f"Test ${document.getElementById('metrics').value.charAt(0).toUpperCase() + document.getElementById('metrics').value.slice(1)}: {test_${document.getElementById('metrics').value}:.4f}"</span>)
+
+<span class="comment"># Plot training history</span>
+<span class="keyword">import</span> matplotlib.pyplot <span class="keyword">as</span> plt
+
+plt.<span class="function">figure</span>(figsize=(<span class="number">12</span>, <span class="number">4</span>))
+
+plt.<span class="function">subplot</span>(<span class="number">1</span>, <span class="number">2</span>, <span class="number">1</span>)
+plt.<span class="function">plot</span>(history.history[<span class="string">'loss'</span>], label=<span class="string">'Training Loss'</span>)
+plt.<span class="function">plot</span>(history.history[<span class="string">'val_loss'</span>], label=<span class="string">'Validation Loss'</span>)
+plt.<span class="function">xlabel</span>(<span class="string">'Epoch'</span>)
+plt.<span class="function">ylabel</span>(<span class="string">'Loss'</span>)
+plt.<span class="function">legend</span>()
+plt.<span class="function">title</span>(<span class="string">'Model Loss'</span>)
+
+plt.<span class="function">subplot</span>(<span class="number">1</span>, <span class="number">2</span>, <span class="number">1</span>)
+plt.<span class="function">plot</span>(history.history[<span class="string">'${document.getElementById('metrics').value}'</span>], label=<span class="string">'Training ${document.getElementById('metrics').value.charAt(0).toUpperCase() + document.getElementById('metrics').value.slice(1)}'</span>)
+plt.<span class="function">plot</span>(history.history[<span class="string">'val_${document.getElementById('metrics').value}'</span>], label=<span class="string">'Validation ${document.getElementById('metrics').value.charAt(0).toUpperCase() + document.getElementById('metrics').value.slice(1)}'</span>)
+plt.<span class="function">xlabel</span>(<span class="string">'Epoch'</span>)
+plt.<span class="function">ylabel</span>(<span class="string">'${document.getElementById('metrics').value.charAt(0).toUpperCase() + document.getElementById('metrics').value.slice(1)}'</span>)
+plt.<span class="function">legend</span>()
+plt.<span class="function">title</span>(<span class="string">'Model ${document.getElementById('metrics').value.charAt(0).toUpperCase() + document.getElementById('metrics').value.slice(1)}'</span>)
+
+plt.<span class="function">tight_layout</span>()
+plt.<span class="function">show</span>()
+
+<span class="comment"># Save the model</span>
+model.<span class="function">save</span>(<span class="string">'my_model.keras'</span>)
+`;
+
+            return code;
         }
 
         function generateLayerCode(layer, indent = '', functional = false) {
@@ -1421,6 +1731,102 @@ model.<span class="function">summary</span>()
             if (window.innerWidth <= 1024) {
                 const section = header.parentElement;
                 section.classList.toggle('collapsed');
+            }
+        }
+
+        // Dataset configuration
+        let columnMappings = [];
+
+        function toggleDatasetConfig() {
+            const codeType = document.getElementById('codeType').value;
+            const datasetSection = document.getElementById('datasetConfigSection');
+            
+            if (codeType === 'with_data') {
+                datasetSection.style.display = 'block';
+                updateDatasetPreview();
+            } else {
+                datasetSection.style.display = 'none';
+            }
+        }
+
+        function updateDatasetPreview() {
+            const datasetType = document.getElementById('datasetType').value;
+            const csvConfig = document.getElementById('csvConfig');
+            const builtinConfig = document.getElementById('builtinConfig');
+            
+            csvConfig.style.display = 'none';
+            builtinConfig.style.display = 'none';
+            
+            if (datasetType === 'csv') {
+                csvConfig.style.display = 'block';
+            } else if (datasetType === 'builtin') {
+                builtinConfig.style.display = 'block';
+            }
+        }
+
+        function generateColumnMapping() {
+            const numColumns = parseInt(document.getElementById('numColumns').value);
+            const container = document.getElementById('columnMapping');
+            
+            columnMappings = [];
+            
+            let html = '<div class="info-box"><strong>Configure your columns:</strong> Specify column names and their roles</div>';
+            html += '<table class="column-mapping-table">';
+            html += '<thead><tr>';
+            html += '<th>Column Index</th>';
+            html += '<th>Column Name</th>';
+            html += '<th>Type</th>';
+            html += '<th>Use For</th>';
+            html += '</tr></thead><tbody>';
+            
+            for (let i = 0; i < numColumns; i++) {
+                const isLast = i === numColumns - 1;
+                columnMappings.push({
+                    index: i,
+                    name: `column_${i}`,
+                    type: isLast ? 'target' : 'feature',
+                    useFor: 'both'
+                });
+                
+                html += `<tr>
+                    <td>${i}</td>
+                    <td><input type="text" value="column_${i}" onchange="updateColumnName(${i}, this.value)" placeholder="e.g., age, price"></td>
+                    <td>
+                        <select onchange="updateColumnType(${i}, this.value)">
+                            <option value="feature" ${!isLast ? 'selected' : ''}>Feature (X)</option>
+                            <option value="target" ${isLast ? 'selected' : ''}>Target (y)</option>
+                        </select>
+                    </td>
+                    <td>
+                        <select onchange="updateColumnUse(${i}, this.value)">
+                            <option value="both" selected>Train & Test</option>
+                            <option value="train">Train Only</option>
+                            <option value="test">Test Only</option>
+                            <option value="exclude">Exclude</option>
+                        </select>
+                    </td>
+                </tr>`;
+            }
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function updateColumnName(index, name) {
+            if (columnMappings[index]) {
+                columnMappings[index].name = name;
+            }
+        }
+
+        function updateColumnType(index, type) {
+            if (columnMappings[index]) {
+                columnMappings[index].type = type;
+            }
+        }
+
+        function updateColumnUse(index, useFor) {
+            if (columnMappings[index]) {
+                columnMappings[index].useFor = useFor;
             }
         }
 
